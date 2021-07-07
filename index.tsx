@@ -1,17 +1,28 @@
-import React, { useState } from 'react';
-import AMap from './AMap.tsx';
+import React, { useState, useEffect } from 'react';
+import AMap from '@/components/AMap';
 import { Markers } from 'react-amap';
 import { Input, message, Select } from 'antd';
-import { debounce } from './utils.tsx';
+import { debounce } from '@/utils';
 
 const { Option } = Select;
 
 import './index.less';
 
 interface IF {
-  // 点击地图可标记
-  clickmarker?: Boolean;
+  // 开启点击地图可标记
+  canClickMarker?: Boolean;
+  // 开启搜索
+  canSearch?: Boolean;
+  // 搜索后返回数据
+  returnSearchData?: Function;
+  // 地图中心
+  mapCenter?: Object;
+  // 搜索选择回调
   onSelect?: Function;
+  // 传一个地址进来，与getlnglat配合使用
+  sendAddr?: string;
+  // 根据 sendAddr 地址查找对应的经纬度并返回
+  returnLnglat?: Function;
 }
 
 export default (props: IF) => {
@@ -19,9 +30,9 @@ export default (props: IF) => {
 
   const [amap, setAmap] = useState<any>(null);
   const [zoom, setZoom] = useState<number>(11);
-  const [mapCenter, setMapCenter] = useState<any>({
-    longitude: 116.700799,
-    latitude: 39.514814,
+  const [center, setCenter] = useState<any>({
+    longitude: 116.407526,
+    latitude: 39.90403
   });
 
   const [geocoder, setGeocoder] = useState<any>(null);
@@ -30,6 +41,19 @@ export default (props: IF) => {
 
   const [addrRes, setAddrRes] = useState<any>(null);
   const [markers, setMarkers] = useState<any>([]);
+
+  useEffect(() => {
+    console.log(props.mapCenter)
+    if (props.mapCenter) {
+      setCenter(props.mapCenter)
+    }
+  }, [props.mapCenter])
+
+  useEffect(() => {
+    if (props.sendAddr !== '') {
+      getLnglat(props.sendAddr as string)
+    }
+  }, [props.sendAddr])
 
   // 初始化
   const handleAMapCreated = (ins: any) => {
@@ -74,17 +98,27 @@ export default (props: IF) => {
           });
           setPlaceSearch(_placeSearch);
         });
-
-        // AMAP.event.addListener(autoComplete, "select", (event: any) => {
-        //   _autocomplete.search(event.poi.name)
-        // })
       }
     }
   };
 
+  // 根据地址查找经纬度
+  const getLnglat = (addr: string) => {
+    if (addr === '') return
+    geocoder.getLocation(addr, function (status: any, result: any) {
+      if (status === 'complete' && result.geocodes.length) {
+        let lnglat = result.geocodes[0].location
+        setMarker(lnglat);
+        props.returnLnglat && props.returnLnglat(lnglat)
+      } else {
+        props.returnLnglat && props.returnLnglat(null)
+      }
+    })
+  }
+
   // 点击地图后获取经纬度以及位置
   const handleAMapClick = (ins: any) => {
-    if (!props.clickmarker) return;
+    if (!props.canClickMarker) return;
     const { lnglat } = ins;
     setMarker(lnglat);
 
@@ -107,12 +141,13 @@ export default (props: IF) => {
         break;
       }
     }
+    props.returnSearchData && props.returnSearchData(curr)
     setMarker(curr.location);
     props.onSelect && props.onSelect(curr);
   };
 
   const setMarker = (lnglat: { lng: string; lat: string }) => {
-    setMapCenter({
+    setCenter({
       longitude: lnglat.lng,
       latitude: lnglat.lat,
     });
@@ -124,7 +159,7 @@ export default (props: IF) => {
         },
       },
     ]);
-    setZoom(15);
+    setZoom(20);
   };
 
   // Select 输入事件监听，填充选择项
@@ -144,31 +179,35 @@ export default (props: IF) => {
     <div className="amap-wrap">
       <AMap
         zoom={zoom}
-        center={mapCenter}
+        center={center}
         events={{
           click: handleAMapClick,
           created: handleAMapCreated,
         }}
       >
-        <div className="amap-wrap-search">
-          <Select
-            showSearch
-            className="amap-wrap-search-comp"
-            optionFilterProp="children"
-            placeholder="请输入地址"
-            onSearch={debounce(handleSearch, 1000)}
-            onFocus={(event: any) => handleSearch(event.target.value, true)}
-            onChange={handleTextChange}
-          >
-            {addrOptions.map((item: any) => {
-              return (
-                <Option key={item.id} value={item.id}>
-                  {item.name}
-                </Option>
-              );
-            })}
-          </Select>
-        </div>
+        {
+          props.canSearch && (
+            <div className="amap-wrap-search">
+              <Select
+                showSearch
+                className="amap-wrap-search-comp"
+                optionFilterProp="children"
+                placeholder="请输入地址"
+                onSearch={debounce(handleSearch, 1000)}
+                onFocus={(event: any) => handleSearch(event.target.value, true)}
+                onChange={handleTextChange}
+              >
+                {addrOptions.map((item: any) => {
+                  return (
+                    <Option key={item.id} value={item.id}>
+                      {item.name}
+                    </Option>
+                  );
+                })}
+              </Select>
+            </div>
+          )
+        }
         <Markers markers={markers}></Markers>
       </AMap>
     </div>
