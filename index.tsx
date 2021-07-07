@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import AMap from '@/components/AMap';
+import AMap from './AMap.tsx';
 import { Markers } from 'react-amap';
 import { Input, message, Select } from 'antd';
-import { debounce } from '@/utils';
+import { debounce } from './utils.tsx';
 
 const { Option } = Select;
 
